@@ -1,5 +1,6 @@
 import os
 import pytest
+import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
@@ -63,26 +64,70 @@ def test_scraper_on_browserstack(caps):
     )
     try:
         driver.get('https://elpais.com/opinion/')
-        # Wait for articles to load
         WebDriverWait(driver, 15).until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'article'))
         )
-        articles = driver.find_elements(By.CSS_SELECTOR, 'article')
-        titles = []
-        for art in articles[:5]:
+        articles = driver.find_elements(By.CSS_SELECTOR, 'article')[:5]
+        results = []
+        all_ok = True
+        for idx, art in enumerate(articles, 1):
             try:
-                title = art.find_element(By.CSS_SELECTOR, 'h2, h1').text
+                title = art.find_element(By.CSS_SELECTOR, 'h2, h1').text.strip()
             except Exception:
                 title = ''
-            titles.append(title)
-        print("Scraped article titles:")
-        for i, t in enumerate(titles, 1):
-            print(f"{i}. {t}")
-        if len([t for t in titles if t.strip()]) >= 5:
-            driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"passed","reason": "Scraped 5 article titles successfully"}}')
+            try:
+                link = art.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
+            except Exception:
+                link = None
+            try:
+                img_url = art.find_element(By.CSS_SELECTOR, 'img').get_attribute('src')
+            except Exception:
+                img_url = None
+            content = ''
+            if link:
+                try:
+                    driver.execute_script("window.open(arguments[0]);", link)
+                    driver.switch_to.window(driver.window_handles[-1])
+                    WebDriverWait(driver, 10).until(
+                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[data-dtm-region="articulo_cuerpo"] p'))
+                    )
+                    paragraphs = driver.find_elements(By.CSS_SELECTOR, 'div[data-dtm-region="articulo_cuerpo"] p')
+                    content = '\n'.join([p.text.strip() for p in paragraphs if p.text.strip()])
+                    driver.close()
+                    driver.switch_to.window(driver.window_handles[0])
+                except Exception:
+                    content = ''
+                    if len(driver.window_handles) > 1:
+                        driver.close()
+                        driver.switch_to.window(driver.window_handles[0])
+            # Check image URL
+            img_status = None
+            if img_url:
+                try:
+                    resp = requests.get(img_url, timeout=10)
+                    img_status = resp.status_code
+                except Exception:
+                    img_status = None
+            results.append({
+                'title': title,
+                'content': content,
+                'img_url': img_url,
+                'img_status': img_status
+            })
+            # Validation
+            if not title or not content or img_status != 200:
+                all_ok = False
+        # Print results
+        for i, res in enumerate(results, 1):
+            print(f"\nArticle {i}:")
+            print(f"Title: {res['title']}")
+            print(f"Content: {res['content'][:300]}...\n")
+            print(f"Image URL: {res['img_url']} (Status: {res['img_status']})")
+        if all_ok:
+            driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"passed","reason": "Scraped 5 articles with titles, content, and images"}}')
         else:
-            driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"failed","reason": "Could not scrape 5 article titles"}}')
-            assert False, "Could not scrape 5 article titles"
+            driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"failed","reason": "One or more articles missing title, content, or image"}}')
+            assert False, "One or more articles missing title, content, or image"
     except Exception as e:
         driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"failed","reason": "Test failed: %s"}}' % str(e))
         raise

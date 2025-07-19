@@ -12,7 +12,7 @@ This project scrapes the first five articles from the "Opinión" (Opinion) secti
 - **Image Download:** Downloads and saves cover images for each article (if available).
 - **Translation:** Translates article titles from Spanish to English using Google Translate.
 - **Text Analysis:** Identifies words repeated more than twice in the translated headers.
-- **Cross-Browser Testing:** Runs the workflow on BrowserStack across 5 parallel browsers/devices using Selenium and pytest. The BrowserStack test now scrapes and prints the first 5 article titles in each browser/device, demonstrating the full workflow cross-browser.
+- **Cross-Browser Testing:** Runs the workflow on BrowserStack across 5 parallel browsers/devices using Selenium and pytest. The BrowserStack test now scrapes and prints the first 5 article titles and content, checks image accessibility, and marks the session as passed only if all 5 articles have non-empty titles, content, and accessible images.
 
 ---
 
@@ -90,9 +90,9 @@ python -m pytest -n 5 test_cross_browser.py
 ```
 
 - This will run the test in parallel on 5 browsers/devices via BrowserStack.
-- **The test will scrape and print the first 5 article titles in each browser/device.**
+- **The test will scrape and print the first 5 article titles and content in each browser/device, check image accessibility, and mark the session as passed only if all 5 articles have non-empty titles, content, and accessible images.**
 - You can view the results and videos in your [BrowserStack Automate dashboard](https://automate.browserstack.com/dashboard/v2/builds).
-- Each session will be marked as "passed" if 5 article titles are found, or "failed" otherwise.
+- Each session will be marked as "passed" if all 5 articles are valid, or "failed" otherwise.
 
 ---
 
@@ -125,12 +125,11 @@ Content: ...
 **BrowserStack test output:**
 
 ```
-Scraped article titles:
-1. Un proyecto falto de ambición
-2. Miseria en Cuba
-3. ...
-4. ...
-5. ...
+Article 1:
+Title: Un proyecto falto de ambición
+Content: ...
+Image URL: https://... (Status: 200)
+...
 ```
 
 ---
