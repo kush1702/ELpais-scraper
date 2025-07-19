@@ -61,5 +61,9 @@ def test_scraper_on_browserstack(caps):
     try:
         driver.get('https://elpais.com/opinion/')
         assert 'Opinión' in driver.title or 'Opinion' in driver.title
+        driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"passed","reason": "Title matched"}}')
+    except Exception as e:
+        driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"failed","reason": "Test failed: %s"}}' % str(e))
+        raise
     finally:
         driver.quit() 
