@@ -4,6 +4,9 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.safari.options import Options as SafariOptions
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -60,8 +63,26 @@ def test_scraper_on_browserstack(caps):
     )
     try:
         driver.get('https://elpais.com/opinion/')
-        assert 'Opinión' in driver.title or 'Opinion' in driver.title
-        driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"passed","reason": "Title matched"}}')
+        # Wait for articles to load
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'article'))
+        )
+        articles = driver.find_elements(By.CSS_SELECTOR, 'article')
+        titles = []
+        for art in articles[:5]:
+            try:
+                title = art.find_element(By.CSS_SELECTOR, 'h2, h1').text
+            except Exception:
+                title = ''
+            titles.append(title)
+        print("Scraped article titles:")
+        for i, t in enumerate(titles, 1):
+            print(f"{i}. {t}")
+        if len([t for t in titles if t.strip()]) >= 5:
+            driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"passed","reason": "Scraped 5 article titles successfully"}}')
+        else:
+            driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"failed","reason": "Could not scrape 5 article titles"}}')
+            assert False, "Could not scrape 5 article titles"
     except Exception as e:
         driver.execute_script('browserstack_executor: {"action": "setSessionStatus", "arguments": {"status":"failed","reason": "Test failed: %s"}}' % str(e))
         raise
